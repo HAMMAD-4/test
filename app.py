@@ -298,17 +298,17 @@ def add_user():
     phones = request.form.getlist('phone')
     roles = request.form.getlist('role')
 
-    def value_at(values, index):
+    def safe_get_list_value(values, index):
         return values[index] if index < len(values) else ''
 
-    entry_count = max(len(names), len(cnics), len(emails), len(phones), len(roles))
+    entry_count = min(len(names), len(cnics), len(emails), len(roles))
     new_users = []
     for index in range(entry_count):
-        name = normalize_text(value_at(names, index))
-        cnic = normalize_text(value_at(cnics, index))
-        email = normalize_text(value_at(emails, index))
-        phone = normalize_optional_text(value_at(phones, index))
-        role = normalize_role(value_at(roles, index) or 'User')
+        name = normalize_text(safe_get_list_value(names, index))
+        cnic = normalize_text(safe_get_list_value(cnics, index))
+        email = normalize_text(safe_get_list_value(emails, index))
+        phone = normalize_optional_text(safe_get_list_value(phones, index))
+        role = normalize_role(safe_get_list_value(roles, index) or 'User')
         if not (name and cnic and email):
             continue
         new_users.append(User(
