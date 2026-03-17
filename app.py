@@ -1,12 +1,20 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from werkzeug.security import check_password_hash, generate_password_hash
+import os
+import secrets
 
 app = Flask(__name__)
-app.secret_key = 'master_secure_key_123'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 
-# WAMP Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:@localhost/crud_db'
+# Database Configuration
+database_url = os.environ.get('DATABASE_URL')
+if not database_url:
+    database_url = 'sqlite:///app.db'
+elif database_url.startswith('mysql://'):
+    database_url = database_url.replace('mysql://', 'mysql+mysqlconnector://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -96,6 +104,9 @@ DEFAULT_SERVICES = [
     },
 ]
 
+DEFAULT_ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
+DEFAULT_ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+
 with app.app_context():
     db.create_all()
     # Seed services only if table is empty
@@ -103,6 +114,17 @@ with app.app_context():
         for s in DEFAULT_SERVICES:
             db.session.add(Service(**s))
         db.session.commit()
+    if DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_PASSWORD:
+        admin_username = DEFAULT_ADMIN_USERNAME.strip()
+        admin_password = DEFAULT_ADMIN_PASSWORD.strip()
+        if admin_username and admin_password:
+            admin = Admin.query.filter_by(username=admin_username).first()
+            if not admin:
+                db.session.add(Admin(
+                    username=admin_username,
+                    password=generate_password_hash(admin_password)
+                ))
+                db.session.commit()
 
 # ─── HELPERS ───────────────────────────────────────────────────────────────────
 
@@ -115,6 +137,29 @@ def login_required(fn):
         return fn(*args, **kwargs)
     return wrapped
 
+def normalize_text(value):
+    if value is None:
+        return ''
+    return value.strip()
+
+def normalize_optional_text(value):
+    cleaned = normalize_text(value)
+    return cleaned or None
+
+def verify_admin_password(admin, password):
+    if not admin or not password:
+        return False
+    try:
+        if check_password_hash(admin.password, password):
+            return True
+    except ValueError:
+        pass
+    if admin.password == password:
+        admin.password = generate_password_hash(password)
+        db.session.commit()
+        return True
+    return False
+
 # ─── AUTH ROUTES ───────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -124,11 +169,10 @@ def root():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        admin = Admin.query.filter_by(
-            username=request.form['username'],
-            password=request.form['password']
-        ).first()
-        if admin:
+        username = normalize_text(request.form.get('username'))
+        password = request.form.get('password', '')
+        admin = Admin.query.filter_by(username=username).first()
+        if verify_admin_password(admin, password):
             session['logged_in'] = True
             session['user'] = admin.username
             return redirect(url_for('dashboard'))
@@ -165,11 +209,11 @@ def users():
 @login_required
 def add_user():
     db.session.add(User(
-        name  = request.form.get('name'),
-        cnic  = request.form.get('cnic'),
-        email = request.form.get('email'),
-        phone = request.form.get('phone'),
-        role  = request.form.get('role', 'User'),
+        name  = normalize_text(request.form.get('name')),
+        cnic  = normalize_text(request.form.get('cnic')),
+        email = normalize_text(request.form.get('email')),
+        phone = normalize_optional_text(request.form.get('phone')),
+        role  = normalize_text(request.form.get('role', 'User')) or 'User',
     ))
     db.session.commit()
     flash('User added successfully.')
@@ -180,11 +224,11 @@ def add_user():
 def edit_user(id):
     user = User.query.get_or_404(id)
     if request.method == 'POST':
-        user.name  = request.form.get('name')
-        user.cnic  = request.form.get('cnic')
-        user.email = request.form.get('email')
-        user.phone = request.form.get('phone')
-        user.role  = request.form.get('role', 'User')
+        user.name  = normalize_text(request.form.get('name'))
+        user.cnic  = normalize_text(request.form.get('cnic'))
+        user.email = normalize_text(request.form.get('email'))
+        user.phone = normalize_optional_text(request.form.get('phone'))
+        user.role  = normalize_text(request.form.get('role', 'User')) or 'User'
         db.session.commit()
         flash('User updated successfully.')
         return redirect(url_for('users'))
@@ -229,12 +273,12 @@ def services():
 @login_required
 def add_service():
     db.session.add(Service(
-        name        = request.form.get('name'),
-        category    = request.form.get('category'),
-        description = request.form.get('description'),
-        poc_name    = request.form.get('poc_name'),
-        poc_email   = request.form.get('poc_email'),
-        poc_phone   = request.form.get('poc_phone'),
+        name        = normalize_text(request.form.get('name')),
+        category    = normalize_text(request.form.get('category')),
+        description = normalize_text(request.form.get('description')),
+        poc_name    = normalize_text(request.form.get('poc_name')),
+        poc_email   = normalize_text(request.form.get('poc_email')),
+        poc_phone   = normalize_text(request.form.get('poc_phone')),
     ))
     db.session.commit()
     flash('Service added successfully.')
@@ -245,12 +289,12 @@ def add_service():
 def edit_service(id):
     svc = Service.query.get_or_404(id)
     if request.method == 'POST':
-        svc.name        = request.form.get('name')
-        svc.category    = request.form.get('category')
-        svc.description = request.form.get('description')
-        svc.poc_name    = request.form.get('poc_name')
-        svc.poc_email   = request.form.get('poc_email')
-        svc.poc_phone   = request.form.get('poc_phone')
+        svc.name        = normalize_text(request.form.get('name'))
+        svc.category    = normalize_text(request.form.get('category'))
+        svc.description = normalize_text(request.form.get('description'))
+        svc.poc_name    = normalize_text(request.form.get('poc_name'))
+        svc.poc_email   = normalize_text(request.form.get('poc_email'))
+        svc.poc_phone   = normalize_text(request.form.get('poc_phone'))
         db.session.commit()
         flash('Service updated.')
         return redirect(url_for('services'))
@@ -275,4 +319,4 @@ def restore_service(id):
     return redirect(url_for('services'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=os.environ.get('FLASK_DEBUG') == '1')
