@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trash — Admin Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0d0f14;
+            --surface: #161b26;
+            --card: #1e2535;
+            --accent: #6c63ff;
+            --accent2: #00d4ff;
+            --danger: #ff4d6d;
+            --success: #10b981;
+            --text: #e6eaf3;
+            --muted: #8892a4;
+            --border: rgba(255, 255, 255, .07);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            height: 60px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .nav-logo {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .nav-logo span {
+            color: var(--accent);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 6px;
+        }
+
+        .nav-links a {
+            color: var(--muted);
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: .875rem;
+            font-weight: 500;
+            transition: all .2s;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            color: #fff;
+            background: var(--card);
+        }
+
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-user span {
+            color: var(--muted);
+            font-size: .85rem;
+        }
+
+        .nav-user strong {
+            color: #fff;
+        }
+
+        .btn-logout {
+            background: rgba(255, 77, 109, .12);
+            color: var(--danger);
+            border: 1px solid rgba(255, 77, 109, .25);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: .84rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: background .2s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 77, 109, .22);
+        }
+
+        main {
+            padding: 36px 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
+        }
+
+        .page-header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        .page-header p {
+            color: var(--muted);
+            font-size: .85rem;
+            margin-top: 4px;
+        }
+
+        .flash-green {
+            background: rgba(16, 185, 129, .12);
+            border: 1px solid rgba(16, 185, 129, .3);
+            color: #6ee7b7;
+            border-radius: 10px;
+            padding: 10px 16px;
+            margin-bottom: 20px;
+            font-size: .88rem;
+        }
+
+        /* WARNING BANNER */
+        .warn-banner {
+            background: rgba(245, 158, 11, .08);
+            border: 1px solid rgba(245, 158, 11, .25);
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            color: #fcd34d;
+            font-size: .86rem;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .table-wrapper {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 22px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table-header .title {
+            font-weight: 600;
+            font-size: .95rem;
+        }
+
+        .badge-red {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: .76rem;
+            font-weight: 600;
+            background: rgba(255, 77, 109, .12);
+            color: var(--danger);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead tr {
+            background: var(--surface);
+        }
+
+        thead th {
+            padding: 13px 18px;
+            text-align: left;
+            font-size: .75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, .04);
+            transition: background .15s;
+            opacity: .75;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 255, 255, .03);
+            opacity: 1;
+        }
+
+        tbody td {
+            padding: 14px 18px;
+            font-size: .875rem;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #fff;
+            text-decoration: line-through;
+            text-decoration-color: var(--danger);
+        }
+
+        .user-email {
+            color: var(--muted);
+            font-size: .82rem;
+            margin-top: 2px;
+        }
+
+        .meta {
+            color: var(--muted);
+            font-size: .78rem;
+        }
+
+        .deleted-at {
+            color: var(--danger);
+            font-size: .78rem;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: .75rem;
+            font-weight: 600;
+            opacity: .6;
+        }
+
+        .role-Admin {
+            background: rgba(108, 99, 255, .18);
+            color: #a89fff;
+        }
+
+        .role-Manager {
+            background: rgba(0, 212, 255, .12);
+            color: #67e8f9;
+        }
+
+        .role-User {
+            background: rgba(255, 255, 255, .07);
+            color: var(--muted);
+        }
+
+        .btn-restore {
+            padding: 6px 16px;
+            background: rgba(16, 185, 129, .12);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, .3);
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: .82rem;
+            font-weight: 600;
+            transition: all .2s;
+        }
+
+        .btn-restore:hover {
+            background: rgba(16, 185, 129, .25);
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px 0;
+            color: var(--muted);
+        }
+
+        .empty .icon {
+            font-size: 44px;
+            margin-bottom: 14px;
+        }
+
+        .btn-back {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 9px 20px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            text-decoration: none;
+            font-size: .88rem;
+            transition: background .2s;
+        }
+
+        .btn-back:hover {
+            background: rgba(255, 255, 255, .08);
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <div class="nav-logo">Admin<span>Portal</span></div>
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/users">Users</a>
+            <a href="/services">Services</a>
+            <a href="/trash" class="active">Trash</a>
+        </div>
+        <div class="nav-user">
+            <span>Logged in as <strong>{{ session['user'] }}</strong></span>
+            <a href="/logout" class="btn-logout">Logout</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="page-header">
+            <div>
+                <h1>🗑️ Deleted Users (Trash)</h1>
+                <p>Records below are soft-deleted and hidden from the system — restore them any time</p>
+            </div>
+            <a href="/users" class="btn-back">← Back to Users</a>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash-green">✓ {{ msg }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+
+        {% if users %}
+        <div class="warn-banner">
+            ⚠️ <span>These users are <strong>soft-deleted</strong> — their data is preserved. Click <em>Restore</em> to
+                reinstate.</span>
+        </div>
+
+        <div class="table-wrapper">
+            <div class="table-header">
+                <span class="title">Trashed Users</span>
+                <span class="badge-red">{{ users|length }} deleted</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name / Email</th>
+                        <th>CNIC</th>
+                        <th>Phone</th>
+                        <th>Role</th>
+                        <th>Deleted On</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td class="meta">{{ user.id }}</td>
+                        <td>
+                            <div class="user-name">{{ user.name }}</div>
+                            <div class="user-email">{{ user.email }}</div>
+                        </td>
+                        <td class="meta">{{ user.cnic }}</td>
+                        <td class="meta">{{ user.phone or '—' }}</td>
+                        <td><span class="role-badge role-{{ user.role }}">{{ user.role }}</span></td>
+                        <td class="deleted-at">
+                            {{ user.deleted_at.strftime('%b %d, %Y %H:%M') if user.deleted_at else '—' }}
+                        </td>
+                        <td>
+                            <a href="/restore/{{ user.id }}" class="btn-restore">♻️ Restore</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty">
+            <div class="icon">🎉</div>
+            <p>No deleted users — trash is empty!</p>
+            <a href="/users" class="btn-back">← Go to Users</a>
+        </div>
+        {% endif %}
+    </main>
+</body>
+
+</html>

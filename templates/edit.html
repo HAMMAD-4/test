@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit User — Admin Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0d0f14;
+            --surface: #161b26;
+            --card: #1e2535;
+            --accent: #6c63ff;
+            --accent2: #00d4ff;
+            --danger: #ff4d6d;
+            --text: #e6eaf3;
+            --muted: #8892a4;
+            --border: rgba(255, 255, 255, .07);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            height: 60px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .nav-logo {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .nav-logo span {
+            color: var(--accent);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 6px;
+        }
+
+        .nav-links a {
+            color: var(--muted);
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: .875rem;
+            font-weight: 500;
+            transition: all .2s;
+        }
+
+        .nav-links a:hover {
+            color: #fff;
+            background: var(--card);
+        }
+
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-user span {
+            color: var(--muted);
+            font-size: .85rem;
+        }
+
+        .nav-user strong {
+            color: #fff;
+        }
+
+        .btn-logout {
+            background: rgba(255, 77, 109, .12);
+            color: var(--danger);
+            border: 1px solid rgba(255, 77, 109, .25);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: .84rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: background .2s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 77, 109, .22);
+        }
+
+        main {
+            padding: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .breadcrumb {
+            color: var(--muted);
+            font-size: .85rem;
+            margin-bottom: 24px;
+        }
+
+        .breadcrumb a {
+            color: var(--accent2);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .sub {
+            color: var(--muted);
+            font-size: .88rem;
+            margin-bottom: 32px;
+        }
+
+        .form-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 32px;
+        }
+
+        .field {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: .78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 11px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: .92rem;
+            outline: none;
+            transition: border-color .2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        input::placeholder {
+            color: var(--muted);
+        }
+
+        select option {
+            background: var(--surface);
+        }
+
+        .row2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 28px;
+        }
+
+        .btn-save {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            font-weight: 600;
+            font-size: .95rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: opacity .2s, transform .15s;
+        }
+
+        .btn-save:hover {
+            opacity: .86;
+            transform: translateY(-1px);
+        }
+
+        .btn-cancel {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: rgba(255, 255, 255, .05);
+            color: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: .95rem;
+            font-weight: 500;
+            transition: background .2s;
+        }
+
+        .btn-cancel:hover {
+            background: rgba(255, 255, 255, .09);
+            color: var(--text);
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <div class="nav-logo">Admin<span>Portal</span></div>
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/users">Users</a>
+            <a href="/services">Services</a>
+            <a href="/trash">Trash</a>
+        </div>
+        <div class="nav-user">
+            <span>Logged in as <strong>{{ session['user'] }}</strong></span>
+            <a href="/logout" class="btn-logout">Logout</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="breadcrumb">
+            <a href="/users">← Users</a> / Edit User #{{ user.id }}
+        </div>
+        <h1>✏️ Edit User</h1>
+        <p class="sub">Update the details for <strong>{{ user.name }}</strong></p>
+
+        <div class="form-card">
+            <form action="/edit/{{ user.id }}" method="POST">
+                <div class="field">
+                    <label>Full Name</label>
+                    <input type="text" name="name" value="{{ user.name }}" required placeholder="Full Name">
+                </div>
+                <div class="row2">
+                    <div class="field">
+                        <label>CNIC / ID No.</label>
+                        <input type="text" name="cnic" value="{{ user.cnic }}" placeholder="CNIC">
+                    </div>
+                    <div class="field">
+                        <label>Phone</label>
+                        <input type="text" name="phone" value="{{ user.phone or '' }}" placeholder="Phone Number">
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Email Address</label>
+                    <input type="email" name="email" value="{{ user.email }}" required placeholder="Email">
+                </div>
+                <div class="field">
+                    <label>Role</label>
+                    <select name="role">
+                        <option value="User" {% if user.role=='User' %}selected{% endif %}>User</option>
+                        <option value="Manager" {% if user.role=='Manager' %}selected{% endif %}>Manager</option>
+                        <option value="Admin" {% if user.role=='Admin' %}selected{% endif %}>Admin</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-save">Save Changes</button>
+                    <a href="/users" class="btn-cancel">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+
+</html>

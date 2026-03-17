@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services — Admin Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0d0f14;
+            --surface: #161b26;
+            --card: #1e2535;
+            --accent: #6c63ff;
+            --accent2: #00d4ff;
+            --danger: #ff4d6d;
+            --success: #10b981;
+            --warn: #f59e0b;
+            --text: #e6eaf3;
+            --muted: #8892a4;
+            --border: rgba(255, 255, 255, .07);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            height: 60px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .nav-logo {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .nav-logo span {
+            color: var(--accent);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 6px;
+        }
+
+        .nav-links a {
+            color: var(--muted);
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: .875rem;
+            font-weight: 500;
+            transition: all .2s;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            color: #fff;
+            background: var(--card);
+        }
+
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-user span {
+            color: var(--muted);
+            font-size: .85rem;
+        }
+
+        .nav-user strong {
+            color: #fff;
+        }
+
+        .btn-logout {
+            background: rgba(255, 77, 109, .12);
+            color: var(--danger);
+            border: 1px solid rgba(255, 77, 109, .25);
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: .84rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background .2s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 77, 109, .22);
+        }
+
+        main {
+            padding: 36px 40px;
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            margin-bottom: 28px;
+        }
+
+        .page-header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        .page-header p {
+            color: var(--muted);
+            font-size: .85rem;
+            margin-top: 4px;
+        }
+
+        .flash {
+            background: rgba(16, 185, 129, .12);
+            border: 1px solid rgba(16, 185, 129, .3);
+            color: #6ee7b7;
+            border-radius: 10px;
+            padding: 10px 16px;
+            margin-bottom: 20px;
+            font-size: .88rem;
+        }
+
+        /* ADD PANEL */
+        .add-panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .add-panel h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--accent2);
+        }
+
+        .form-grid2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .form-grid2 input,
+        .form-grid2 select,
+        .form-grid2 textarea {
+            padding: 10px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: .88rem;
+            outline: none;
+            transition: border-color .2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .form-grid2 input::placeholder,
+        .form-grid2 textarea::placeholder {
+            color: var(--muted);
+        }
+
+        .form-grid2 input:focus,
+        .form-grid2 select:focus,
+        .form-grid2 textarea:focus {
+            border-color: var(--accent);
+        }
+
+        .form-grid2 select option {
+            background: var(--surface);
+        }
+
+        .form-grid2 textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .span-full {
+            grid-column: 1/-1;
+        }
+
+        .btn-add {
+            margin-top: 14px;
+            padding: 10px 22px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff;
+            font-weight: 600;
+            font-size: .88rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: opacity .2s, transform .15s;
+        }
+
+        .btn-add:hover {
+            opacity: .85;
+            transform: translateY(-1px);
+        }
+
+        /* CATEGORY COLOURS */
+        .cat {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: .74rem;
+            font-weight: 600;
+        }
+
+        .cat-Cloud {
+            background: rgba(0, 212, 255, .12);
+            color: #67e8f9;
+        }
+
+        .cat-Security {
+            background: rgba(255, 77, 109, .12);
+            color: #fda4af;
+        }
+
+        .cat-AI\/ML {
+            background: rgba(139, 92, 246, .15);
+            color: #c4b5fd;
+        }
+
+        .cat-Enterprise {
+            background: rgba(245, 158, 11, .12);
+            color: #fcd34d;
+        }
+
+        .cat-DevOps {
+            background: rgba(16, 185, 129, .12);
+            color: #6ee7b7;
+        }
+
+        .cat-Analytics {
+            background: rgba(108, 99, 255, .15);
+            color: #a89fff;
+        }
+
+        /* SERVICE CARDS GRID */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 22px;
+        }
+
+        .svc-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 26px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            transition: transform .2s, box-shadow .2s, border-color .2s;
+        }
+
+        .svc-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, .35);
+            border-color: rgba(108, 99, 255, .3);
+        }
+
+        .svc-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .svc-name {
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+
+        .svc-desc {
+            color: var(--muted);
+            font-size: .86rem;
+            line-height: 1.65;
+        }
+
+        /* POC BLOCK */
+        .poc-block {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .poc-title {
+            font-size: .72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        .poc-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .poc-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .poc-icon {
+            font-size: 14px;
+            width: 22px;
+            text-align: center;
+        }
+
+        .poc-val {
+            font-size: .84rem;
+            color: var(--text);
+        }
+
+        .poc-val a {
+            color: var(--accent2);
+            text-decoration: none;
+        }
+
+        .poc-val a:hover {
+            text-decoration: underline;
+        }
+
+        /* ACTIONS */
+        .svc-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .btn-edit {
+            flex: 1;
+            padding: 7px 0;
+            text-align: center;
+            background: rgba(108, 99, 255, .15);
+            color: #a89fff;
+            border: 1px solid rgba(108, 99, 255, .3);
+            border-radius: 9px;
+            text-decoration: none;
+            font-size: .82rem;
+            font-weight: 600;
+            transition: all .2s;
+        }
+
+        .btn-edit:hover {
+            background: rgba(108, 99, 255, .3);
+        }
+
+        .btn-delete {
+            flex: 1;
+            padding: 7px 0;
+            text-align: center;
+            background: rgba(255, 77, 109, .1);
+            color: var(--danger);
+            border: 1px solid rgba(255, 77, 109, .25);
+            border-radius: 9px;
+            text-decoration: none;
+            font-size: .82rem;
+            font-weight: 600;
+            transition: all .2s;
+        }
+
+        .btn-delete:hover {
+            background: rgba(255, 77, 109, .25);
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px 0;
+            color: var(--muted);
+        }
+
+        .empty .icon {
+            font-size: 44px;
+            margin-bottom: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <div class="nav-logo">Admin<span>Portal</span></div>
+        <div class="nav-links">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/users">Users</a>
+            <a href="/services" class="active">Services</a>
+            <a href="/trash">Trash</a>
+        </div>
+        <div class="nav-user">
+            <span>Logged in as <strong>{{ session['user'] }}</strong></span>
+            <a href="/logout" class="btn-logout">Logout</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="page-header">
+            <h1>🛠️ Services Directory</h1>
+            <p>Browse and manage all service offerings with point-of-contact details</p>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}{% for msg in messages %}<div class="flash">✓ {{ msg }}</div>{% endfor %}{% endif %}
+        {% endwith %}
+
+        <!-- ADD FORM -->
+        <div class="add-panel">
+            <h3>+ Add New Service</h3>
+            <form action="/services/add" method="POST">
+                <div class="form-grid2">
+                    <input type="text" name="name" placeholder="Service Name" required>
+                    <select name="category" required>
+                        <option value="" disabled selected>Select Category</option>
+                        <option value="Cloud">Cloud</option>
+                        <option value="Security">Security</option>
+                        <option value="AI/ML">AI / ML</option>
+                        <option value="Enterprise">Enterprise</option>
+                        <option value="DevOps">DevOps</option>
+                        <option value="Analytics">Analytics</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <input type="text" name="poc_name" placeholder="POC Full Name" required>
+                    <input type="email" name="poc_email" placeholder="POC Email" required>
+                    <input type="text" name="poc_phone" placeholder="POC Phone" required>
+                    <textarea name="description" class="span-full" placeholder="Service description…"
+                        required></textarea>
+                </div>
+                <button type="submit" class="btn-add">Add Service</button>
+            </form>
+        </div>
+
+        <!-- CARDS -->
+        {% if services %}
+        <div class="services-grid">
+            {% for svc in services %}
+            <div class="svc-card">
+                <div class="svc-top">
+                    <div class="svc-name">{{ svc.name }}</div>
+                    <span class="cat cat-{{ svc.category | replace('/', '\\/') }}">{{ svc.category }}</span>
+                </div>
+                <p class="svc-desc">{{ svc.description }}</p>
+
+                <div class="poc-block">
+                    <div class="poc-title">📋 Point of Contact</div>
+                    <div class="poc-row">
+                        <span class="poc-icon">👤</span>
+                        <span class="poc-val">{{ svc.poc_name }}</span>
+                    </div>
+                    <div class="poc-row">
+                        <span class="poc-icon">✉️</span>
+                        <span class="poc-val"><a href="mailto:{{ svc.poc_email }}">{{ svc.poc_email }}</a></span>
+                    </div>
+                    <div class="poc-row">
+                        <span class="poc-icon">📞</span>
+                        <span class="poc-val">{{ svc.poc_phone }}</span>
+                    </div>
+                </div>
+
+                <div class="svc-actions">
+                    <a href="/services/edit/{{ svc.id }}" class="btn-edit">✏️ Edit</a>
+                    <a href="/services/delete/{{ svc.id }}" class="btn-delete"
+                        onclick="return confirm('Remove service {{ svc.name }}?')">🗑️ Remove</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">
+            <div class="icon">🛠️</div>
+            <p>No services found. Add one above.</p>
+        </div>
+        {% endif %}
+    </main>
+</body>
+
+</html>
