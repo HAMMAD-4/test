@@ -13,6 +13,7 @@ secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
     if is_debug:
         secret_key = secrets.token_hex(32)
+        app.logger.warning('SECRET_KEY not set; using an ephemeral key for debug sessions.')
     else:
         raise RuntimeError('SECRET_KEY environment variable must be set')
 app.config['SECRET_KEY'] = secret_key
@@ -126,22 +127,24 @@ def password_matches(stored_hash, candidate):
     except ValueError:
         return False
 
-def ensure_column(table_name, column_name, column_definition):
+def ensure_users_phone_column():
     try:
         inspector = inspect(db.engine)
-        columns = {column['name'] for column in inspector.get_columns(table_name)}
-    except SQLAlchemyError:
+        columns = {column['name'] for column in inspector.get_columns('users')}
+    except SQLAlchemyError as exc:
+        app.logger.warning('Unable to inspect users table for phone column: %s', exc)
         return
-    if column_name in columns:
+    if 'phone' in columns:
         return
-    db.session.execute(text(
-        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
-    ))
-    db.session.commit()
+    try:
+        db.session.execute(text('ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL'))
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        app.logger.warning('Unable to add users.phone column: %s', exc)
 
 with app.app_context():
     db.create_all()
-    ensure_column('users', 'phone', 'VARCHAR(20) NULL')
+    ensure_users_phone_column()
     # Seed services only if table is empty
     if Service.query.count() == 0:
         for s in DEFAULT_SERVICES:
@@ -159,6 +162,7 @@ with app.app_context():
                 ))
                 db.session.commit()
             else:
+                # Sync stored admin password only when explicitly enabled.
                 if ALLOW_ADMIN_PASSWORD_UPDATE and not password_matches(admin.password, admin_password):
                     admin.password = generate_password_hash(admin_password)
                     db.session.commit()
