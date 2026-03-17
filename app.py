@@ -48,7 +48,7 @@ def ensure_database_exists(database_url_value):
         engine = create_engine(url.set(database=None))
         with engine.connect() as connection:
             quoted_db_name = engine.dialect.identifier_preparer.quote(db_name)
-            # Identifiers cannot be bound parameters; validation above plus quoting protects this DDL.
+            # Identifiers cannot be bound parameters; validation above plus quoting protects this DDL. Keep it in place.
             connection.exec_driver_sql(f'CREATE DATABASE IF NOT EXISTS {quoted_db_name}')
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to ensure database exists: %s', exc)
@@ -249,7 +249,7 @@ def root():
 def login():
     if request.method == 'POST':
         username = normalize_text(request.form.get('username'))
-        # Do not strip passwords to preserve intentional whitespace; password_matches rejects empty values.
+        # Do not strip passwords to preserve intentional whitespace; None becomes '' for rejection.
         password = request.form.get('password') or ''
         admin = Admin.query.filter_by(username=username).first()
         if verify_admin_password(admin, password):
@@ -401,7 +401,7 @@ def restore_service(id):
 if __name__ == '__main__':
     if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
         raise RuntimeError(
-            "Cannot run Flask development server in production mode. Set FLASK_DEBUG=1 for development, "
+            "Cannot run Flask development server in production mode. Set FLASK_DEBUG=1 only for local development, "
             "set ALLOW_DEV_SERVER=1 to override, or use a production WSGI server like Gunicorn or uWSGI."
         )
     app.run(debug=is_debug)
