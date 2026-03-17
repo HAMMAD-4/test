@@ -40,8 +40,7 @@ def ensure_database_exists(database_url_value):
     if url.get_backend_name() != 'mysql' or not url.database:
         return
     db_name = url.database
-    # Hyphens are supported because we always use dialect-quoted identifiers.
-    if not all(char.isalnum() or char in {'_', '-'} for char in db_name):
+    if not all(char.isalnum() or char == '_' for char in db_name):
         app.logger.warning('Skipping database creation due to invalid name: %s', db_name)
         return
     engine = None
@@ -408,7 +407,6 @@ if __name__ == '__main__':
         raise RuntimeError(
             "Cannot run Flask development server in production mode. Set FLASK_DEBUG=1 only for local development, "
             "set ALLOW_DEV_SERVER=1 to override (unsafe for production; do not use in production), or use a "
-            "production WSGI server like "
-            "Gunicorn or uWSGI."
+            "production WSGI server like Gunicorn or uWSGI."
         )
     app.run(debug=is_debug)
