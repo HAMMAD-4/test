@@ -2,8 +2,10 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
-from sqlalchemy import inspect, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import make_url
+from sqlalchemy.schema import CreateSchema
 import os
 import secrets
 
@@ -26,6 +28,27 @@ elif database_url.startswith('mysql://'):
     database_url = database_url.replace('mysql://', 'mysql+mysqlconnector://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+def ensure_database_exists(database_url_value):
+    try:
+        url = make_url(database_url_value)
+    except Exception as exc:
+        app.logger.warning('Unable to parse DATABASE_URL; skipping database creation: %s', exc)
+        return
+    if url.get_backend_name() != 'mysql' or not url.database:
+        return
+    engine = None
+    try:
+        engine = create_engine(url.set(database=None))
+        with engine.connect() as connection:
+            connection.execute(CreateSchema(url.database, if_not_exists=True))
+    except SQLAlchemyError as exc:
+        app.logger.warning('Unable to ensure database exists: %s', exc)
+    finally:
+        if engine is not None:
+            engine.dispose()
+
+ensure_database_exists(database_url)
 
 db = SQLAlchemy(app)
 
