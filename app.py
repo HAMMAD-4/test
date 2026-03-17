@@ -117,6 +117,7 @@ DEFAULT_SERVICES = [
 DEFAULT_ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 DEFAULT_ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 ALLOW_ADMIN_PASSWORD_UPDATE = os.environ.get('UPDATE_ADMIN_PASSWORD') == '1'
+DEFAULT_PHONE_LENGTH = 20
 VALID_ROLES = {'User', 'Manager', 'Admin'}
 
 def password_matches(stored_hash, candidate):
@@ -137,7 +138,9 @@ def ensure_users_phone_column():
     if 'phone' in columns:
         return
     try:
-        phone_length = User.phone.type.length or 20
+        phone_length = User.phone.type.length or DEFAULT_PHONE_LENGTH
+        if not isinstance(phone_length, int) or phone_length <= 0:
+            phone_length = DEFAULT_PHONE_LENGTH
         db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone VARCHAR({phone_length}) NULL'))
         db.session.commit()
     except SQLAlchemyError as exc:
@@ -151,22 +154,21 @@ with app.app_context():
         for s in DEFAULT_SERVICES:
             db.session.add(Service(**s))
         db.session.commit()
-    if DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_PASSWORD:
-        admin_username = DEFAULT_ADMIN_USERNAME.strip()
-        admin_password = DEFAULT_ADMIN_PASSWORD.strip()
-        if admin_username and admin_password:
-            admin = Admin.query.filter_by(username=admin_username).first()
-            if not admin:
-                db.session.add(Admin(
-                    username=admin_username,
-                    password=generate_password_hash(admin_password)
-                ))
+    admin_username = (DEFAULT_ADMIN_USERNAME or '').strip()
+    admin_password = (DEFAULT_ADMIN_PASSWORD or '').strip()
+    if admin_username and admin_password:
+        admin = Admin.query.filter_by(username=admin_username).first()
+        if not admin:
+            db.session.add(Admin(
+                username=admin_username,
+                password=generate_password_hash(admin_password)
+            ))
+            db.session.commit()
+        else:
+            # Sync stored admin password only when explicitly enabled.
+            if ALLOW_ADMIN_PASSWORD_UPDATE and not password_matches(admin.password, admin_password):
+                admin.password = generate_password_hash(admin_password)
                 db.session.commit()
-            else:
-                # Sync stored admin password only when explicitly enabled.
-                if ALLOW_ADMIN_PASSWORD_UPDATE and not password_matches(admin.password, admin_password):
-                    admin.password = generate_password_hash(admin_password)
-                    db.session.commit()
 
 # ─── HELPERS ───────────────────────────────────────────────────────────────────
 
@@ -359,6 +361,7 @@ if __name__ == '__main__':
     if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
         raise RuntimeError(
             "Refusing to start the dev server. Set FLASK_DEBUG=1 for development, "
-            "set ALLOW_DEV_SERVER=1 to override, or use a production WSGI server."
+            "set ALLOW_DEV_SERVER=1 to override, or use a production WSGI server "
+            "like Gunicorn or uWSGI."
         )
     app.run(debug=is_debug)
