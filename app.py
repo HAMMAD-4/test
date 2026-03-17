@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
+from sqlalchemy import inspect, text
+from sqlalchemy.exc import SQLAlchemyError
 import os
 import secrets
 
@@ -124,8 +126,22 @@ def password_matches(stored_hash, candidate):
     except ValueError:
         return False
 
+def ensure_column(table_name, column_name, column_definition):
+    try:
+        inspector = inspect(db.engine)
+        columns = {column['name'] for column in inspector.get_columns(table_name)}
+    except SQLAlchemyError:
+        return
+    if column_name in columns:
+        return
+    db.session.execute(text(
+        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
+    ))
+    db.session.commit()
+
 with app.app_context():
     db.create_all()
+    ensure_column('users', 'phone', 'VARCHAR(20) NULL')
     # Seed services only if table is empty
     if Service.query.count() == 0:
         for s in DEFAULT_SERVICES:
