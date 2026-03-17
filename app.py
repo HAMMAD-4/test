@@ -6,10 +6,10 @@ import os
 import secrets
 
 app = Flask(__name__)
-IS_DEBUG = os.environ.get('FLASK_DEBUG') == '1'
+is_debug = os.environ.get('FLASK_DEBUG') == '1'
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
-    if IS_DEBUG:
+    if is_debug:
         secret_key = secrets.token_hex(32)
     else:
         raise RuntimeError('SECRET_KEY environment variable must be set')
@@ -115,6 +115,14 @@ DEFAULT_ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 DEFAULT_ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 VALID_ROLES = {'User', 'Manager', 'Admin'}
 
+def password_matches(stored_hash, candidate):
+    if not stored_hash or not candidate:
+        return False
+    try:
+        return check_password_hash(stored_hash, candidate)
+    except ValueError:
+        return False
+
 with app.app_context():
     db.create_all()
     # Seed services only if table is empty
@@ -134,12 +142,7 @@ with app.app_context():
                 ))
                 db.session.commit()
             else:
-                needs_update = False
-                try:
-                    needs_update = not check_password_hash(admin.password, admin_password)
-                except ValueError:
-                    needs_update = True
-                if needs_update:
+                if not password_matches(admin.password, admin_password):
                     admin.password = generate_password_hash(admin_password)
                     db.session.commit()
 
@@ -168,12 +171,9 @@ def normalize_role(value):
     return cleaned if cleaned in VALID_ROLES else 'User'
 
 def verify_admin_password(admin, password):
-    if not admin or not password:
+    if not admin:
         return False
-    try:
-        return check_password_hash(admin.password, password)
-    except ValueError:
-        return False
+    return password_matches(admin.password, password)
 
 # ─── AUTH ROUTES ───────────────────────────────────────────────────────────────
 
@@ -334,6 +334,6 @@ def restore_service(id):
     return redirect(url_for('services'))
 
 if __name__ == '__main__':
-    if not IS_DEBUG and os.environ.get('ALLOW_DEV_SERVER') != '1':
+    if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
         raise RuntimeError('Refusing to start the dev server without FLASK_DEBUG=1 or ALLOW_DEV_SERVER=1')
-    app.run(debug=IS_DEBUG)
+    app.run(debug=is_debug)
