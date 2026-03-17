@@ -375,6 +375,7 @@ def empty_trash():
         flash('Trash is already empty.')
         return redirect(url_for('trash'))
 
+    # No ORM instances are retained after this bulk delete, so session sync is unnecessary.
     deleted_query.delete(synchronize_session=False)
     db.session.commit()
     flash(f'Trash emptied — {deleted_count} user(s) permanently deleted.')
