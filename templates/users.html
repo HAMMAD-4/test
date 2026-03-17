@@ -474,7 +474,7 @@
                             <option value="Admin">Admin</option>
                         </select>
                         <button type="button" class="btn btn-add" onclick="addRow()" title="Add another user" aria-label="Add another user">+</button>
-                        <button type="button" class="btn btn-remove" onclick="this.parentElement.remove()" title="Remove this user" aria-label="Remove this user">−</button>
+                        <button type="button" class="btn btn-remove" onclick="removeRow(this)" title="Remove this user" aria-label="Remove this user">−</button>
                     </div>
                 </div>
                 <div class="form-row">
@@ -552,14 +552,41 @@
                     <option value="Admin">Admin</option>
                 </select>
                 <button type="button" class="btn btn-add" onclick="addRow()" title="Add another user" aria-label="Add another user">+</button>
-                <button type="button" class="btn btn-remove" onclick="this.parentElement.remove()" title="Remove this user" aria-label="Remove this user">−</button>
+                <button type="button" class="btn btn-remove" onclick="removeRow(this)" title="Remove this user" aria-label="Remove this user">−</button>
             `;
             container.appendChild(newRow);
             const firstInput = newRow.querySelector('input');
             if (firstInput) {
                 firstInput.focus();
             }
+            updateRowControls();
         }
+
+        function removeRow(button) {
+            const row = button?.closest('.entry-row');
+            if (!row) {
+                return;
+            }
+            row.remove();
+            updateRowControls();
+        }
+
+        function updateRowControls() {
+            const container = document.getElementById('input-container');
+            if (!container) {
+                return;
+            }
+            const rows = container.querySelectorAll('.entry-row');
+            rows.forEach((row) => {
+                const removeButton = row.querySelector('.btn-remove');
+                if (!removeButton) {
+                    return;
+                }
+                removeButton.style.display = rows.length === 1 ? 'none' : '';
+            });
+        }
+
+        updateRowControls();
     </script>
 </body>
 
