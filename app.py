@@ -48,6 +48,7 @@ def ensure_database_exists(database_url_value):
         engine = create_engine(url.set(database=None))
         with engine.connect() as connection:
             quoted_db_name = engine.dialect.identifier_preparer.quote(db_name)
+            # Identifiers cannot be bound parameters; validation + quoting protects this DDL.
             connection.exec_driver_sql(f'CREATE DATABASE IF NOT EXISTS {quoted_db_name}')
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to ensure database exists: %s', exc)
@@ -248,7 +249,7 @@ def root():
 def login():
     if request.method == 'POST':
         username = normalize_text(request.form.get('username'))
-        # Do not strip passwords to preserve intentional whitespace; default to '' for comparisons.
+        # Do not strip passwords to preserve intentional whitespace; empty strings won't authenticate.
         password = request.form.get('password') or ''
         admin = Admin.query.filter_by(username=username).first()
         if verify_admin_password(admin, password):
