@@ -138,9 +138,11 @@ def ensure_users_phone_column():
     if 'phone' in columns:
         return
     try:
-        phone_length = User.phone.type.length or DEFAULT_PHONE_LENGTH
-        if not isinstance(phone_length, int) or phone_length <= 0:
+        try:
+            phone_length = int(User.phone.type.length or DEFAULT_PHONE_LENGTH)
+        except (TypeError, ValueError):
             phone_length = DEFAULT_PHONE_LENGTH
+        phone_length = min(max(phone_length, 1), 255)
         db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone VARCHAR({phone_length}) NULL'))
         db.session.commit()
     except SQLAlchemyError as exc:
@@ -360,8 +362,7 @@ def restore_service(id):
 if __name__ == '__main__':
     if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
         raise RuntimeError(
-            "Refusing to start the dev server. Set FLASK_DEBUG=1 for development, "
-            "set ALLOW_DEV_SERVER=1 to override, or use a production WSGI server "
-            "like Gunicorn or uWSGI."
+            "Cannot run Flask development server in production mode. Set FLASK_DEBUG=1 for development, "
+            "set ALLOW_DEV_SERVER=1 to override, or use a production WSGI server like Gunicorn or uWSGI."
         )
     app.run(debug=is_debug)
