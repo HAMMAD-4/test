@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
-import hmac
 import os
 import secrets
 
@@ -114,6 +113,7 @@ DEFAULT_SERVICES = [
 
 DEFAULT_ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 DEFAULT_ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+VALID_ROLES = {'User', 'Manager', 'Admin'}
 
 with app.app_context():
     db.create_all()
@@ -133,6 +133,15 @@ with app.app_context():
                     password=generate_password_hash(admin_password)
                 ))
                 db.session.commit()
+            else:
+                needs_update = False
+                try:
+                    needs_update = not check_password_hash(admin.password, admin_password)
+                except ValueError:
+                    needs_update = True
+                if needs_update:
+                    admin.password = generate_password_hash(admin_password)
+                    db.session.commit()
 
 # ─── HELPERS ───────────────────────────────────────────────────────────────────
 
@@ -154,15 +163,17 @@ def normalize_optional_text(value):
     cleaned = normalize_text(value)
     return cleaned or None
 
+def normalize_role(value):
+    cleaned = normalize_text(value)
+    return cleaned if cleaned in VALID_ROLES else 'User'
+
 def verify_admin_password(admin, password):
     if not admin or not password:
         return False
     try:
-        if check_password_hash(admin.password, password):
-            return True
+        return check_password_hash(admin.password, password)
     except ValueError:
-        pass
-    return hmac.compare_digest(admin.password or '', password)
+        return False
 
 # ─── AUTH ROUTES ───────────────────────────────────────────────────────────────
 
@@ -217,7 +228,7 @@ def add_user():
         cnic  = normalize_text(request.form.get('cnic')),
         email = normalize_text(request.form.get('email')),
         phone = normalize_optional_text(request.form.get('phone')),
-        role  = normalize_text(request.form.get('role', 'User')) or 'User',
+        role  = normalize_role(request.form.get('role', 'User')),
     ))
     db.session.commit()
     flash('User added successfully.')
@@ -232,7 +243,7 @@ def edit_user(id):
         user.cnic  = normalize_text(request.form.get('cnic'))
         user.email = normalize_text(request.form.get('email'))
         user.phone = normalize_optional_text(request.form.get('phone'))
-        user.role  = normalize_text(request.form.get('role', 'User')) or 'User'
+        user.role  = normalize_role(request.form.get('role', 'User'))
         db.session.commit()
         flash('User updated successfully.')
         return redirect(url_for('users'))
@@ -324,5 +335,5 @@ def restore_service(id):
 
 if __name__ == '__main__':
     if not IS_DEBUG and os.environ.get('ALLOW_DEV_SERVER') != '1':
-        raise RuntimeError('Refusing to start the dev server without FLASK_DEBUG=1')
+        raise RuntimeError('Refusing to start the dev server without FLASK_DEBUG=1 or ALLOW_DEV_SERVER=1')
     app.run(debug=IS_DEBUG)
