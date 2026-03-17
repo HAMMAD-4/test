@@ -116,13 +116,27 @@ DEFAULT_SERVICES = [
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+# Support both env names for backward compatibility.
 ALLOW_ADMIN_PASSWORD_UPDATE = (
     os.environ.get('ALLOW_ADMIN_PASSWORD_UPDATE') == '1'
     or os.environ.get('UPDATE_ADMIN_PASSWORD') == '1'
 )
-DEFAULT_PHONE_LENGTH = 20
-MAX_PHONE_LENGTH = 255
 VALID_ROLES = {'User', 'Manager', 'Admin'}
+# Keep this aligned with User.phone (String(20)).
+PHONE_COLUMN_DEFINITION = 'VARCHAR(20) NULL'
+
+def normalize_text(value):
+    if value is None:
+        return ''
+    return value.strip()
+
+def normalize_optional_text(value):
+    cleaned = normalize_text(value)
+    return cleaned or None
+
+def normalize_role(value):
+    cleaned = normalize_text(value)
+    return cleaned if cleaned in VALID_ROLES else 'User'
 
 def password_matches(stored_hash, candidate):
     if not stored_hash or not candidate:
@@ -131,15 +145,6 @@ def password_matches(stored_hash, candidate):
         return check_password_hash(stored_hash, candidate)
     except ValueError:
         return False
-
-def resolve_phone_length():
-    raw_length = getattr(User.phone.type, 'length', None)
-    try:
-        phone_length = int(raw_length or DEFAULT_PHONE_LENGTH)
-    except (TypeError, ValueError):
-        phone_length = DEFAULT_PHONE_LENGTH
-    phone_length = min(max(phone_length, 1), MAX_PHONE_LENGTH)
-    return int(phone_length)
 
 def ensure_users_phone_column():
     try:
@@ -151,8 +156,7 @@ def ensure_users_phone_column():
     if 'phone' in columns:
         return
     try:
-        phone_length = resolve_phone_length()
-        db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone VARCHAR({phone_length}) NULL'))
+        db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone {PHONE_COLUMN_DEFINITION}'))
         db.session.commit()
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to add users.phone column: %s', exc)
@@ -165,8 +169,8 @@ with app.app_context():
         for s in DEFAULT_SERVICES:
             db.session.add(Service(**s))
         db.session.commit()
-    admin_username = (ADMIN_USERNAME or '').strip()
-    admin_password = (ADMIN_PASSWORD or '').strip()
+    admin_username = normalize_text(ADMIN_USERNAME)
+    admin_password = normalize_text(ADMIN_PASSWORD)
     if admin_username and admin_password:
         admin = Admin.query.filter_by(username=admin_username).first()
         if not admin:
@@ -191,19 +195,6 @@ def login_required(fn):
             return redirect(url_for('login'))
         return fn(*args, **kwargs)
     return wrapped
-
-def normalize_text(value):
-    if value is None:
-        return ''
-    return value.strip()
-
-def normalize_optional_text(value):
-    cleaned = normalize_text(value)
-    return cleaned or None
-
-def normalize_role(value):
-    cleaned = normalize_text(value)
-    return cleaned if cleaned in VALID_ROLES else 'User'
 
 def verify_admin_password(admin, password):
     if not admin:
