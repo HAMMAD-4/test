@@ -292,11 +292,11 @@ def users():
 @app.route('/add', methods=['POST'])
 @login_required
 def add_user():
-    names = request.form.getlist('name')
-    cnics = request.form.getlist('cnic')
-    emails = request.form.getlist('email')
-    phones = request.form.getlist('phone')
-    roles = request.form.getlist('role')
+    names = request.form.getlist('name[]')
+    cnics = request.form.getlist('cnic[]')
+    emails = request.form.getlist('email[]')
+    phones = request.form.getlist('phone[]')
+    roles = request.form.getlist('role[]')
 
     entry_count = min(len(names), len(cnics), len(emails), len(roles))
     new_users = []

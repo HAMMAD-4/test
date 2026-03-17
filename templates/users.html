@@ -170,7 +170,9 @@
         }
 
         .form-grid input,
-        .form-grid select {
+        .form-grid select,
+        .entry-row input,
+        .entry-row select {
             padding: 10px 14px;
             background: var(--surface);
             border: 1px solid var(--border);
@@ -182,43 +184,43 @@
             font-family: 'Inter', sans-serif;
         }
 
-        .form-grid input::placeholder {
+        .form-grid input::placeholder,
+        .entry-row input::placeholder {
             color: var(--muted);
         }
 
         .form-grid input:focus,
-        .form-grid select:focus {
+        .form-grid select:focus,
+        .entry-row input:focus,
+        .entry-row select:focus {
             border-color: var(--accent);
         }
 
-        .form-grid select {
+        .form-grid select,
+        .entry-row select {
             cursor: pointer;
         }
 
-        .form-grid select option {
+        .form-grid select option,
+        .entry-row select option {
             background: var(--surface);
         }
 
-        .user-entries {
+        .input-container {
             display: flex;
             flex-direction: column;
-            gap: 16px;
-        }
-
-        .user-entry {
-            display: grid;
-            grid-template-columns: 1fr auto;
             gap: 12px;
-            align-items: start;
         }
 
-        .entry-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+        .form-row.entry-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) 36px 36px;
+            gap: 12px;
+            align-items: center;
+            margin-top: 0;
         }
 
-        .entry-actions button {
+        .entry-row .btn {
             width: 36px;
             height: 36px;
             border-radius: 10px;
@@ -230,15 +232,9 @@
             transition: opacity .2s, transform .15s;
         }
 
-        .entry-actions button:hover {
+        .entry-row .btn:hover {
             opacity: .85;
             transform: translateY(-1px);
-        }
-
-        .entry-actions button:disabled {
-            opacity: .45;
-            cursor: not-allowed;
-            transform: none;
         }
 
         .btn-add {
@@ -466,23 +462,19 @@
         <div class="add-panel">
             <h3>+ Add New User</h3>
             <form action="/add" method="POST">
-                <div class="user-entries" id="user-entries">
-                    <div class="user-entry">
-                        <div class="form-grid">
-                            <input type="text" name="name" placeholder="Full Name" required>
-                            <input type="text" name="cnic" placeholder="CNIC / ID No." required>
-                            <input type="email" name="email" placeholder="Email Address" required>
-                            <input type="text" name="phone" placeholder="Phone Number">
-                            <select name="role">
-                                <option value="User">User</option>
-                                <option value="Manager">Manager</option>
-                                <option value="Admin">Admin</option>
-                            </select>
-                        </div>
-                        <div class="entry-actions">
-                            <button type="button" class="btn-duplicate" aria-label="Add another user" title="Add another user">+</button>
-                            <button type="button" class="btn-remove" aria-label="Remove this user" title="Remove this user" disabled>−</button>
-                        </div>
+                <div class="input-container" id="input-container">
+                    <div class="form-row entry-row">
+                        <input type="text" name="name[]" placeholder="Full Name" required>
+                        <input type="text" name="cnic[]" placeholder="CNIC / ID No." required>
+                        <input type="email" name="email[]" placeholder="Email Address" required>
+                        <input type="text" name="phone[]" placeholder="Phone Number">
+                        <select name="role[]">
+                            <option value="User">User</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                        <button type="button" class="btn btn-add" onclick="addRow()" title="Add another user" aria-label="Add another user">+</button>
+                        <button type="button" class="btn btn-remove" onclick="this.parentElement.remove()" title="Remove this user" aria-label="Remove this user">−</button>
                     </div>
                 </div>
                 <div class="form-row">
@@ -542,57 +534,32 @@
         </div>
     </main>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const entries = document.getElementById('user-entries');
-            if (!entries) {
+        function addRow() {
+            const container = document.getElementById('input-container');
+            if (!container) {
                 return;
             }
-
-            const updateRemoveButtons = () => {
-                const removeButtons = entries.querySelectorAll('.btn-remove');
-                const disable = entries.children.length === 1;
-                removeButtons.forEach((button) => {
-                    button.disabled = disable;
-                });
-            };
-
-            const resetEntryValues = (entry) => {
-                entry.querySelectorAll('input, select').forEach((field) => {
-                    if (field.tagName === 'SELECT') {
-                        field.selectedIndex = 0;
-                    } else {
-                        field.value = '';
-                    }
-                });
-            };
-
-            entries.addEventListener('click', (event) => {
-                const duplicateButton = event.target.closest('.btn-duplicate');
-                const removeButton = event.target.closest('.btn-remove');
-
-                if (duplicateButton) {
-                    const entry = duplicateButton.closest('.user-entry');
-                    const clone = entry.cloneNode(true);
-                    resetEntryValues(clone);
-                    entries.appendChild(clone);
-                    updateRemoveButtons();
-                    const firstInput = clone.querySelector('input');
-                    if (firstInput) {
-                        firstInput.focus();
-                    }
-                }
-
-                if (removeButton) {
-                    const entry = removeButton.closest('.user-entry');
-                    if (entry) {
-                        entry.remove();
-                        updateRemoveButtons();
-                    }
-                }
-            });
-
-            updateRemoveButtons();
-        });
+            const newRow = document.createElement('div');
+            newRow.className = 'form-row entry-row';
+            newRow.innerHTML = `
+                <input type="text" name="name[]" placeholder="Full Name" required>
+                <input type="text" name="cnic[]" placeholder="CNIC / ID No." required>
+                <input type="email" name="email[]" placeholder="Email Address" required>
+                <input type="text" name="phone[]" placeholder="Phone Number">
+                <select name="role[]">
+                    <option value="User">User</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Admin">Admin</option>
+                </select>
+                <button type="button" class="btn btn-add" onclick="addRow()" title="Add another user" aria-label="Add another user">+</button>
+                <button type="button" class="btn btn-remove" onclick="this.parentElement.remove()" title="Remove this user" aria-label="Remove this user">−</button>
+            `;
+            container.appendChild(newRow);
+            const firstInput = newRow.querySelector('input');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }
     </script>
 </body>
 
