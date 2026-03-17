@@ -1,13 +1,62 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from werkzeug.security import check_password_hash, generate_password_hash
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import make_url
+import os
+import secrets
 
 app = Flask(__name__)
-app.secret_key = 'master_secure_key_123'
+is_debug = os.environ.get('FLASK_DEBUG') == '1'
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    if is_debug:
+        secret_key = secrets.token_hex(32)
+        app.logger.warning(
+            'SECRET_KEY not set; using an ephemeral key. Sessions will not persist across restarts. '
+            'Debug mode is for local development only.'
+        )
+    else:
+        raise RuntimeError('SECRET_KEY environment variable must be set')
+app.config['SECRET_KEY'] = secret_key
 
-# WAMP Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:@localhost/crud_db'
+# Database Configuration
+database_url = os.environ.get('DATABASE_URL')
+if not database_url:
+    database_url = 'sqlite:///app.db'
+elif database_url.startswith('mysql://'):
+    database_url = database_url.replace('mysql://', 'mysql+mysqlconnector://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+def ensure_database_exists(database_url_value):
+    try:
+        url = make_url(database_url_value)
+    except Exception as exc:
+        app.logger.warning('Unable to parse DATABASE_URL; skipping database creation: %s', exc)
+        return
+    if url.get_backend_name() != 'mysql' or not url.database:
+        return
+    db_name = url.database
+    if not all(char.isalnum() or char == '_' for char in db_name):
+        app.logger.warning('Skipping database creation due to invalid name: %s', db_name)
+        return
+    engine = None
+    try:
+        engine = create_engine(url.set(database=None))
+        with engine.connect() as connection:
+            quoted_db_name = engine.dialect.identifier_preparer.quote(db_name)
+            # Identifiers cannot be bound parameters; validation + quoting together protect this DDL.
+            connection.exec_driver_sql(f'CREATE DATABASE IF NOT EXISTS {quoted_db_name}')
+    except SQLAlchemyError as exc:
+        app.logger.warning('Unable to ensure database exists: %s', exc)
+    finally:
+        if engine is not None:
+            engine.dispose()
+
+ensure_database_exists(database_url)
 
 db = SQLAlchemy(app)
 
@@ -96,13 +145,87 @@ DEFAULT_SERVICES = [
     },
 ]
 
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+# Support both env names for backward compatibility; prefer ALLOW_ADMIN_PASSWORD_UPDATE.
+ALLOW_ADMIN_PASSWORD_UPDATE = (
+    os.environ.get('ALLOW_ADMIN_PASSWORD_UPDATE') == '1'
+    or os.environ.get('UPDATE_ADMIN_PASSWORD') == '1'
+)
+VALID_ROLES = {'User', 'Manager', 'Admin'}
+
+def normalize_text(value):
+    if value is None:
+        return ''
+    return value.strip()
+
+def normalize_optional_text(value):
+    cleaned = normalize_text(value)
+    return cleaned or None
+
+def normalize_role(value):
+    cleaned = normalize_text(value)
+    return cleaned if cleaned in VALID_ROLES else 'User'
+
+def password_matches(stored_hash, candidate):
+    if not stored_hash or not candidate:
+        return False
+    try:
+        return check_password_hash(stored_hash, candidate)
+    except ValueError:
+        return False
+
+def phone_column_sql():
+    try:
+        length = int(getattr(User.phone.type, 'length', 20) or 20)
+    except (TypeError, ValueError):
+        length = 20
+    return f'ALTER TABLE users ADD COLUMN phone VARCHAR({length}) NULL'
+
+def ensure_users_phone_column():
+    try:
+        inspector = inspect(db.engine)
+        columns = {column['name'] for column in inspector.get_columns('users')}
+    except SQLAlchemyError as exc:
+        app.logger.warning(
+            'Unable to inspect users table for phone column; continuing without schema fix: %s',
+            exc
+        )
+        return
+    if 'phone' in columns:
+        return
+    try:
+        db.session.execute(text(phone_column_sql()))
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        app.logger.warning(
+            'Unable to add users.phone column; user queries may fail until schema is updated: %s',
+            exc
+        )
+
 with app.app_context():
     db.create_all()
+    ensure_users_phone_column()
     # Seed services only if table is empty
     if Service.query.count() == 0:
         for s in DEFAULT_SERVICES:
             db.session.add(Service(**s))
         db.session.commit()
+    admin_username = normalize_text(ADMIN_USERNAME)
+    admin_password = normalize_text(ADMIN_PASSWORD)
+    if admin_username and admin_password:
+        admin = Admin.query.filter_by(username=admin_username).first()
+        if not admin:
+            db.session.add(Admin(
+                username=admin_username,
+                password=generate_password_hash(admin_password)
+            ))
+            db.session.commit()
+        else:
+            # Sync stored admin password only when explicitly enabled.
+            if ALLOW_ADMIN_PASSWORD_UPDATE and not password_matches(admin.password, admin_password):
+                admin.password = generate_password_hash(admin_password)
+                db.session.commit()
 
 # ─── HELPERS ───────────────────────────────────────────────────────────────────
 
@@ -115,6 +238,11 @@ def login_required(fn):
         return fn(*args, **kwargs)
     return wrapped
 
+def verify_admin_password(admin, password):
+    if not admin:
+        return False
+    return password_matches(admin.password, password)
+
 # ─── AUTH ROUTES ───────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -124,11 +252,11 @@ def root():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        admin = Admin.query.filter_by(
-            username=request.form['username'],
-            password=request.form['password']
-        ).first()
-        if admin:
+        username = normalize_text(request.form.get('username'))
+        # Do not strip passwords to preserve intentional whitespace; None/empty become '' for rejection.
+        password = request.form.get('password') or ''
+        admin = Admin.query.filter_by(username=username).first()
+        if verify_admin_password(admin, password):
             session['logged_in'] = True
             session['user'] = admin.username
             return redirect(url_for('dashboard'))
@@ -164,15 +292,36 @@ def users():
 @app.route('/add', methods=['POST'])
 @login_required
 def add_user():
-    db.session.add(User(
-        name  = request.form.get('name'),
-        cnic  = request.form.get('cnic'),
-        email = request.form.get('email'),
-        phone = request.form.get('phone'),
-        role  = request.form.get('role', 'User'),
-    ))
-    db.session.commit()
-    flash('User added successfully.')
+    names = request.form.getlist('name[]')
+    cnics = request.form.getlist('cnic[]')
+    emails = request.form.getlist('email[]')
+    phones = request.form.getlist('phone[]')
+    roles = request.form.getlist('role[]')
+
+    entry_count = min(len(names), len(cnics), len(emails), len(roles))
+    new_users = []
+    for index in range(entry_count):
+        name = normalize_text(names[index])
+        cnic = normalize_text(cnics[index])
+        email = normalize_text(emails[index])
+        phone = normalize_optional_text(phones[index] if index < len(phones) else '')
+        role = normalize_role(roles[index] or 'User')
+        if not (name and cnic and email):
+            continue
+        new_users.append(User(
+            name=name,
+            cnic=cnic,
+            email=email,
+            phone=phone,
+            role=role,
+        ))
+
+    if new_users:
+        db.session.add_all(new_users)
+        db.session.commit()
+        flash(f'{len(new_users)} user(s) added successfully.')
+    else:
+        flash('No users were added.')
     return redirect(url_for('users'))
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
@@ -180,11 +329,11 @@ def add_user():
 def edit_user(id):
     user = User.query.get_or_404(id)
     if request.method == 'POST':
-        user.name  = request.form.get('name')
-        user.cnic  = request.form.get('cnic')
-        user.email = request.form.get('email')
-        user.phone = request.form.get('phone')
-        user.role  = request.form.get('role', 'User')
+        user.name  = normalize_text(request.form.get('name'))
+        user.cnic  = normalize_text(request.form.get('cnic'))
+        user.email = normalize_text(request.form.get('email'))
+        user.phone = normalize_optional_text(request.form.get('phone'))
+        user.role  = normalize_role(request.form.get('role', 'User'))
         db.session.commit()
         flash('User updated successfully.')
         return redirect(url_for('users'))
@@ -217,6 +366,21 @@ def trash():
     deleted_users = User.query.filter_by(is_deleted=True).order_by(User.deleted_at.desc()).all()
     return render_template('trash.html', users=deleted_users)
 
+@app.route('/trash/empty', methods=['POST'])
+@login_required
+def empty_trash():
+    deleted_query = User.query.filter_by(is_deleted=True)
+    deleted_count = deleted_query.count()
+    if deleted_count == 0:
+        flash('Trash is already empty.')
+        return redirect(url_for('trash'))
+
+    # No ORM instances are retained after this bulk delete, so session sync is unnecessary.
+    deleted_query.delete(synchronize_session=False)
+    db.session.commit()
+    flash(f'Trash emptied — {deleted_count} user(s) permanently deleted.')
+    return redirect(url_for('trash'))
+
 # ─── SERVICES ROUTES ───────────────────────────────────────────────────────────
 
 @app.route('/services')
@@ -229,12 +393,12 @@ def services():
 @login_required
 def add_service():
     db.session.add(Service(
-        name        = request.form.get('name'),
-        category    = request.form.get('category'),
-        description = request.form.get('description'),
-        poc_name    = request.form.get('poc_name'),
-        poc_email   = request.form.get('poc_email'),
-        poc_phone   = request.form.get('poc_phone'),
+        name        = normalize_text(request.form.get('name')),
+        category    = normalize_text(request.form.get('category')),
+        description = normalize_text(request.form.get('description')),
+        poc_name    = normalize_text(request.form.get('poc_name')),
+        poc_email   = normalize_text(request.form.get('poc_email')),
+        poc_phone   = normalize_text(request.form.get('poc_phone')),
     ))
     db.session.commit()
     flash('Service added successfully.')
@@ -245,12 +409,12 @@ def add_service():
 def edit_service(id):
     svc = Service.query.get_or_404(id)
     if request.method == 'POST':
-        svc.name        = request.form.get('name')
-        svc.category    = request.form.get('category')
-        svc.description = request.form.get('description')
-        svc.poc_name    = request.form.get('poc_name')
-        svc.poc_email   = request.form.get('poc_email')
-        svc.poc_phone   = request.form.get('poc_phone')
+        svc.name        = normalize_text(request.form.get('name'))
+        svc.category    = normalize_text(request.form.get('category'))
+        svc.description = normalize_text(request.form.get('description'))
+        svc.poc_name    = normalize_text(request.form.get('poc_name'))
+        svc.poc_email   = normalize_text(request.form.get('poc_email'))
+        svc.poc_phone   = normalize_text(request.form.get('poc_phone'))
         db.session.commit()
         flash('Service updated.')
         return redirect(url_for('services'))
@@ -275,4 +439,10 @@ def restore_service(id):
     return redirect(url_for('services'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
+        raise RuntimeError(
+            "Cannot run Flask development server in production mode. Set FLASK_DEBUG=1 only for local development, "
+            "set ALLOW_DEV_SERVER=1 to override (unsafe for production; do not use in production), or use a "
+            "production WSGI server like Gunicorn or uWSGI."
+        )
+    app.run(debug=is_debug)

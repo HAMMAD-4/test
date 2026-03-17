@@ -170,7 +170,9 @@
         }
 
         .form-grid input,
-        .form-grid select {
+        .form-grid select,
+        .entry-row input,
+        .entry-row select {
             padding: 10px 14px;
             background: var(--surface);
             border: 1px solid var(--border);
@@ -182,21 +184,57 @@
             font-family: 'Inter', sans-serif;
         }
 
-        .form-grid input::placeholder {
+        .form-grid input::placeholder,
+        .entry-row input::placeholder {
             color: var(--muted);
         }
 
         .form-grid input:focus,
-        .form-grid select:focus {
+        .form-grid select:focus,
+        .entry-row input:focus,
+        .entry-row select:focus {
             border-color: var(--accent);
         }
 
-        .form-grid select {
+        .form-grid select,
+        .entry-row select {
             cursor: pointer;
         }
 
-        .form-grid select option {
+        .form-grid select option,
+        .entry-row select option {
             background: var(--surface);
+        }
+
+        .input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .form-row.entry-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) 36px 36px;
+            gap: 12px;
+            align-items: center;
+            margin-top: 0;
+        }
+
+        .entry-row .btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .2s, transform .15s;
+        }
+
+        .entry-row .btn:hover {
+            opacity: .85;
+            transform: translateY(-1px);
         }
 
         .btn-add {
@@ -424,19 +462,23 @@
         <div class="add-panel">
             <h3>+ Add New User</h3>
             <form action="/add" method="POST">
-                <div class="form-grid">
-                    <input type="text" name="name" placeholder="Full Name" required>
-                    <input type="text" name="cnic" placeholder="CNIC / ID No." required>
-                    <input type="email" name="email" placeholder="Email Address" required>
-                    <input type="text" name="phone" placeholder="Phone Number">
-                    <select name="role">
-                        <option value="User">User</option>
-                        <option value="Manager">Manager</option>
-                        <option value="Admin">Admin</option>
-                    </select>
+                <div class="input-container" id="input-container">
+                    <div class="form-row entry-row">
+                        <input type="text" name="name[]" placeholder="Full Name" required>
+                        <input type="text" name="cnic[]" placeholder="CNIC / ID No." required>
+                        <input type="email" name="email[]" placeholder="Email Address" required>
+                        <input type="text" name="phone[]" placeholder="Phone Number">
+                        <select name="role[]">
+                            <option value="User">User</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                        <button type="button" class="btn btn-add" onclick="addRow()" title="Add another user" aria-label="Add another user">+</button>
+                        <button type="button" class="btn btn-remove" onclick="removeRow(this)" title="Remove this user" aria-label="Remove this user" style="display: none;">−</button>
+                    </div>
                 </div>
                 <div class="form-row">
-                    <button type="submit" class="btn-add">Add User</button>
+                    <button type="submit" class="btn-add">Add Users</button>
                 </div>
             </form>
         </div>
@@ -491,6 +533,66 @@
             {% endif %}
         </div>
     </main>
+    <script>
+        function addRow() {
+            const container = document.getElementById('input-container');
+            if (!container) {
+                return;
+            }
+            const newRow = document.createElement('div');
+            newRow.className = 'form-row entry-row';
+            newRow.innerHTML = `
+                <input type="text" name="name[]" placeholder="Full Name" required>
+                <input type="text" name="cnic[]" placeholder="CNIC / ID No." required>
+                <input type="email" name="email[]" placeholder="Email Address" required>
+                <input type="text" name="phone[]" placeholder="Phone Number">
+                <select name="role[]">
+                    <option value="User">User</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Admin">Admin</option>
+                </select>
+                <button type="button" class="btn btn-add" onclick="addRow()" title="Add another user" aria-label="Add another user">+</button>
+                <button type="button" class="btn btn-remove" onclick="removeRow(this)" title="Remove this user" aria-label="Remove this user">−</button>
+            `;
+            container.appendChild(newRow);
+            const firstInput = newRow.querySelector('input');
+            if (firstInput) {
+                firstInput.focus();
+            }
+            updateRowControls();
+        }
+
+        function removeRow(button) {
+            const row = button?.closest('.entry-row');
+            if (!row) {
+                return;
+            }
+            const container = document.getElementById('input-container');
+            const rows = container?.querySelectorAll('.entry-row') ?? [];
+            if (rows.length <= 1) {
+                return;
+            }
+            row.remove();
+            updateRowControls();
+        }
+
+        function updateRowControls() {
+            const container = document.getElementById('input-container');
+            if (!container) {
+                return;
+            }
+            const rows = container.querySelectorAll('.entry-row');
+            rows.forEach((row) => {
+                const removeButton = row.querySelector('.btn-remove');
+                if (!removeButton) {
+                    return;
+                }
+                removeButton.style.display = rows.length === 1 ? 'none' : '';
+            });
+        }
+
+        updateRowControls();
+    </script>
 </body>
 
 </html>
