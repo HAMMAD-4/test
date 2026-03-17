@@ -36,14 +36,16 @@ def ensure_database_exists(database_url_value):
         return
     if url.get_backend_name() != 'mysql' or not url.database:
         return
-    if not all(char.isalnum() or char == '_' for char in url.database):
-        app.logger.warning('Skipping database creation due to invalid name: %s', url.database)
+    db_name = url.database
+    if not all(char.isalnum() or char in {'_', '-'} for char in db_name):
+        app.logger.warning('Skipping database creation due to invalid name: %s', db_name)
         return
     engine = None
     try:
         engine = create_engine(url.set(database=None))
         with engine.connect() as connection:
-            connection.execute(text(f'CREATE DATABASE IF NOT EXISTS `{url.database}`'))
+            quoted_db_name = engine.dialect.identifier_preparer.quote(db_name)
+            connection.execute(text(f'CREATE DATABASE IF NOT EXISTS {quoted_db_name}'))
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to ensure database exists: %s', exc)
     finally:
@@ -85,6 +87,13 @@ class Service(db.Model):
     poc_phone   = db.Column(db.String(30), nullable=False)
     is_deleted  = db.Column(db.Boolean, default=False, nullable=False)
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+try:
+    PHONE_COLUMN_LENGTH = int(User.phone.type.length or 20)
+except (TypeError, ValueError):
+    PHONE_COLUMN_LENGTH = 20
+# Keep aligned with User.phone (String(20)).
+PHONE_COLUMN_DEFINITION = f'VARCHAR({PHONE_COLUMN_LENGTH}) NULL'
 
 # ─── DB INIT & SEED ────────────────────────────────────────────────────────────
 
@@ -148,9 +157,6 @@ ALLOW_ADMIN_PASSWORD_UPDATE = (
 )
 VALID_ROLES = {'User', 'Manager', 'Admin'}
 
-if os.environ.get('UPDATE_ADMIN_PASSWORD') == '1' and os.environ.get('ALLOW_ADMIN_PASSWORD_UPDATE') != '1':
-    app.logger.warning('UPDATE_ADMIN_PASSWORD is deprecated; use ALLOW_ADMIN_PASSWORD_UPDATE instead.')
-
 def normalize_text(value):
     if value is None:
         return ''
@@ -187,8 +193,7 @@ def ensure_users_phone_column():
     if 'phone' in columns:
         return
     try:
-        # Keep in sync with User.phone (String(20)).
-        db.session.execute(text('ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL'))
+        db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone {PHONE_COLUMN_DEFINITION}'))
         db.session.commit()
     except SQLAlchemyError as exc:
         app.logger.warning(
