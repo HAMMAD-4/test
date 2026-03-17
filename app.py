@@ -5,7 +5,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.engine import make_url
-from sqlalchemy.schema import CreateSchema
 import os
 import secrets
 
@@ -37,11 +36,14 @@ def ensure_database_exists(database_url_value):
         return
     if url.get_backend_name() != 'mysql' or not url.database:
         return
+    if not all(char.isalnum() or char == '_' for char in url.database):
+        app.logger.warning('Skipping database creation due to invalid name: %s', url.database)
+        return
     engine = None
     try:
         engine = create_engine(url.set(database=None))
         with engine.connect() as connection:
-            connection.execute(CreateSchema(url.database, if_not_exists=True))
+            connection.execute(text(f'CREATE DATABASE IF NOT EXISTS `{url.database}`'))
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to ensure database exists: %s', exc)
     finally:
@@ -173,6 +175,8 @@ def password_matches(stored_hash, candidate):
 def ensure_users_phone_column():
     try:
         inspector = inspect(db.engine)
+        if not inspector.has_table('users'):
+            return
         columns = {column['name'] for column in inspector.get_columns('users')}
     except SQLAlchemyError as exc:
         app.logger.warning(
