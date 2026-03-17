@@ -116,14 +116,15 @@ DEFAULT_SERVICES = [
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
-# Support both env names for backward compatibility.
+# Support both env names for backward compatibility; prefer ALLOW_ADMIN_PASSWORD_UPDATE.
 ALLOW_ADMIN_PASSWORD_UPDATE = (
     os.environ.get('ALLOW_ADMIN_PASSWORD_UPDATE') == '1'
     or os.environ.get('UPDATE_ADMIN_PASSWORD') == '1'
 )
 VALID_ROLES = {'User', 'Manager', 'Admin'}
-# Keep this aligned with User.phone (String(20)).
-PHONE_COLUMN_DEFINITION = 'VARCHAR(20) NULL'
+
+if os.environ.get('UPDATE_ADMIN_PASSWORD') == '1' and os.environ.get('ALLOW_ADMIN_PASSWORD_UPDATE') != '1':
+    app.logger.warning('UPDATE_ADMIN_PASSWORD is deprecated; use ALLOW_ADMIN_PASSWORD_UPDATE instead.')
 
 def normalize_text(value):
     if value is None:
@@ -151,15 +152,22 @@ def ensure_users_phone_column():
         inspector = inspect(db.engine)
         columns = {column['name'] for column in inspector.get_columns('users')}
     except SQLAlchemyError as exc:
-        app.logger.warning('Unable to inspect users table for phone column: %s', exc)
+        app.logger.warning(
+            'Unable to inspect users table for phone column; continuing without schema fix: %s',
+            exc
+        )
         return
     if 'phone' in columns:
         return
     try:
-        db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone {PHONE_COLUMN_DEFINITION}'))
+        # Keep in sync with User.phone (String(20)).
+        db.session.execute(text('ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL'))
         db.session.commit()
     except SQLAlchemyError as exc:
-        app.logger.warning('Unable to add users.phone column: %s', exc)
+        app.logger.warning(
+            'Unable to add users.phone column; user queries may fail until schema is updated: %s',
+            exc
+        )
 
 with app.app_context():
     db.create_all()
@@ -211,7 +219,8 @@ def root():
 def login():
     if request.method == 'POST':
         username = normalize_text(request.form.get('username'))
-        password = request.form.get('password', '')
+        # Do not strip passwords to preserve intentional whitespace.
+        password = request.form.get('password') or ''
         admin = Admin.query.filter_by(username=username).first()
         if verify_admin_password(admin, password):
             session['logged_in'] = True
