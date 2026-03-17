@@ -14,7 +14,9 @@ secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
     if is_debug:
         secret_key = secrets.token_hex(32)
-        app.logger.warning('SECRET_KEY not set; using an ephemeral key for debug sessions.')
+        app.logger.warning(
+            'SECRET_KEY not set; using an ephemeral key. Sessions will not persist across restarts.'
+        )
     else:
         raise RuntimeError('SECRET_KEY environment variable must be set')
 app.config['SECRET_KEY'] = secret_key
@@ -37,6 +39,7 @@ def ensure_database_exists(database_url_value):
     if url.get_backend_name() != 'mysql' or not url.database:
         return
     db_name = url.database
+    # Hyphens are supported because we always use dialect-quoted identifiers.
     if not all(char.isalnum() or char in {'_', '-'} for char in db_name):
         app.logger.warning('Skipping database creation due to invalid name: %s', db_name)
         return
@@ -45,7 +48,7 @@ def ensure_database_exists(database_url_value):
         engine = create_engine(url.set(database=None))
         with engine.connect() as connection:
             quoted_db_name = engine.dialect.identifier_preparer.quote(db_name)
-            connection.execute(text(f'CREATE DATABASE IF NOT EXISTS {quoted_db_name}'))
+            connection.exec_driver_sql(f'CREATE DATABASE IF NOT EXISTS {quoted_db_name}')
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to ensure database exists: %s', exc)
     finally:
@@ -88,12 +91,8 @@ class Service(db.Model):
     is_deleted  = db.Column(db.Boolean, default=False, nullable=False)
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
 
-try:
-    PHONE_COLUMN_LENGTH = int(User.phone.type.length or 20)
-except (TypeError, ValueError):
-    PHONE_COLUMN_LENGTH = 20
 # Keep aligned with User.phone (String(20)).
-PHONE_COLUMN_DEFINITION = f'VARCHAR({PHONE_COLUMN_LENGTH}) NULL'
+PHONE_COLUMN_SQL = 'ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL'
 
 # ─── DB INIT & SEED ────────────────────────────────────────────────────────────
 
@@ -181,8 +180,6 @@ def password_matches(stored_hash, candidate):
 def ensure_users_phone_column():
     try:
         inspector = inspect(db.engine)
-        if not inspector.has_table('users'):
-            return
         columns = {column['name'] for column in inspector.get_columns('users')}
     except SQLAlchemyError as exc:
         app.logger.warning(
@@ -193,7 +190,7 @@ def ensure_users_phone_column():
     if 'phone' in columns:
         return
     try:
-        db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone {PHONE_COLUMN_DEFINITION}'))
+        db.session.execute(text(PHONE_COLUMN_SQL))
         db.session.commit()
     except SQLAlchemyError as exc:
         app.logger.warning(
@@ -251,7 +248,7 @@ def root():
 def login():
     if request.method == 'POST':
         username = normalize_text(request.form.get('username'))
-        # Do not strip passwords to preserve intentional whitespace.
+        # Do not strip passwords to preserve intentional whitespace; default to '' for comparisons.
         password = request.form.get('password') or ''
         admin = Admin.query.filter_by(username=username).first()
         if verify_admin_password(admin, password):
