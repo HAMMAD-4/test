@@ -116,7 +116,10 @@ DEFAULT_SERVICES = [
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
-ALLOW_ADMIN_PASSWORD_UPDATE = os.environ.get('UPDATE_ADMIN_PASSWORD') == '1'
+ALLOW_ADMIN_PASSWORD_UPDATE = (
+    os.environ.get('ALLOW_ADMIN_PASSWORD_UPDATE') == '1'
+    or os.environ.get('UPDATE_ADMIN_PASSWORD') == '1'
+)
 DEFAULT_PHONE_LENGTH = 20
 MAX_PHONE_LENGTH = 255
 VALID_ROLES = {'User', 'Manager', 'Admin'}
@@ -129,6 +132,15 @@ def password_matches(stored_hash, candidate):
     except ValueError:
         return False
 
+def resolve_phone_length():
+    raw_length = getattr(User.phone.type, 'length', None)
+    try:
+        phone_length = int(raw_length or DEFAULT_PHONE_LENGTH)
+    except (TypeError, ValueError):
+        phone_length = DEFAULT_PHONE_LENGTH
+    phone_length = min(max(phone_length, 1), MAX_PHONE_LENGTH)
+    return int(phone_length)
+
 def ensure_users_phone_column():
     try:
         inspector = inspect(db.engine)
@@ -139,15 +151,7 @@ def ensure_users_phone_column():
     if 'phone' in columns:
         return
     try:
-        try:
-            raw_length = User.phone.type.length
-        except AttributeError:
-            raw_length = None
-        try:
-            phone_length = int(raw_length or DEFAULT_PHONE_LENGTH)
-        except (TypeError, ValueError):
-            phone_length = DEFAULT_PHONE_LENGTH
-        phone_length = min(max(phone_length, 1), MAX_PHONE_LENGTH)
+        phone_length = resolve_phone_length()
         db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone VARCHAR({phone_length}) NULL'))
         db.session.commit()
     except SQLAlchemyError as exc:
