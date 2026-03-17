@@ -48,7 +48,7 @@ def ensure_database_exists(database_url_value):
         engine = create_engine(url.set(database=None))
         with engine.connect() as connection:
             quoted_db_name = engine.dialect.identifier_preparer.quote(db_name)
-            # Identifiers cannot be bound parameters; validation above plus quoting protects this DDL. Keep it in place.
+            # Identifiers cannot be bound parameters; keep validation + quoting in place to protect this DDL.
             connection.exec_driver_sql(f'CREATE DATABASE IF NOT EXISTS {quoted_db_name}')
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to ensure database exists: %s', exc)
@@ -91,9 +91,6 @@ class Service(db.Model):
     poc_phone   = db.Column(db.String(30), nullable=False)
     is_deleted  = db.Column(db.Boolean, default=False, nullable=False)
     created_at  = db.Column(db.DateTime, default=datetime.utcnow)
-
-# Keep aligned with User.phone (String(20)).
-PHONE_COLUMN_SQL = 'ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL'
 
 # ─── DB INIT & SEED ────────────────────────────────────────────────────────────
 
@@ -178,6 +175,13 @@ def password_matches(stored_hash, candidate):
     except ValueError:
         return False
 
+def phone_column_sql():
+    try:
+        length = int(getattr(User.phone.type, 'length', 20) or 20)
+    except (TypeError, ValueError):
+        length = 20
+    return f'ALTER TABLE users ADD COLUMN phone VARCHAR({length}) NULL'
+
 def ensure_users_phone_column():
     try:
         inspector = inspect(db.engine)
@@ -191,7 +195,7 @@ def ensure_users_phone_column():
     if 'phone' in columns:
         return
     try:
-        db.session.execute(text(PHONE_COLUMN_SQL))
+        db.session.execute(text(phone_column_sql()))
         db.session.commit()
     except SQLAlchemyError as exc:
         app.logger.warning(
@@ -402,6 +406,7 @@ if __name__ == '__main__':
     if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
         raise RuntimeError(
             "Cannot run Flask development server in production mode. Set FLASK_DEBUG=1 only for local development, "
-            "set ALLOW_DEV_SERVER=1 to override, or use a production WSGI server like Gunicorn or uWSGI."
+            "set ALLOW_DEV_SERVER=1 to override (unsafe for production), or use a production WSGI server like "
+            "Gunicorn or uWSGI."
         )
     app.run(debug=is_debug)
