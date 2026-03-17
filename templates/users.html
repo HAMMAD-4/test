@@ -474,7 +474,7 @@
                             <option value="Admin">Admin</option>
                         </select>
                         <button type="button" class="btn btn-add" onclick="addRow()" title="Add another user" aria-label="Add another user">+</button>
-                        <button type="button" class="btn btn-remove" onclick="removeRow(this)" title="Remove this user" aria-label="Remove this user">−</button>
+                        <button type="button" class="btn btn-remove" onclick="removeRow(this)" title="Remove this user" aria-label="Remove this user" style="display: none;">−</button>
                     </div>
                 </div>
                 <div class="form-row">
@@ -565,6 +565,11 @@
         function removeRow(button) {
             const row = button?.closest('.entry-row');
             if (!row) {
+                return;
+            }
+            const container = document.getElementById('input-container');
+            const rows = container?.querySelectorAll('.entry-row') ?? [];
+            if (rows.length <= 1) {
                 return;
             }
             row.remove();
