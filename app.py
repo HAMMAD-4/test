@@ -15,7 +15,8 @@ if not secret_key:
     if is_debug:
         secret_key = secrets.token_hex(32)
         app.logger.warning(
-            'SECRET_KEY not set; using an ephemeral key. Sessions will not persist across restarts.'
+            'SECRET_KEY not set; using an ephemeral key. Sessions will not persist across restarts. '
+            'Debug mode is for local development only.'
         )
     else:
         raise RuntimeError('SECRET_KEY environment variable must be set')
@@ -48,7 +49,7 @@ def ensure_database_exists(database_url_value):
         engine = create_engine(url.set(database=None))
         with engine.connect() as connection:
             quoted_db_name = engine.dialect.identifier_preparer.quote(db_name)
-            # Identifiers cannot be bound parameters; keep validation + quoting in place to protect this DDL.
+            # Identifiers cannot be bound parameters; validation + quoting together protect this DDL.
             connection.exec_driver_sql(f'CREATE DATABASE IF NOT EXISTS {quoted_db_name}')
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to ensure database exists: %s', exc)
@@ -253,7 +254,7 @@ def root():
 def login():
     if request.method == 'POST':
         username = normalize_text(request.form.get('username'))
-        # Do not strip passwords to preserve intentional whitespace; None becomes '' for rejection.
+        # Do not strip passwords to preserve intentional whitespace; None/empty become '' for rejection.
         password = request.form.get('password') or ''
         admin = Admin.query.filter_by(username=username).first()
         if verify_admin_password(admin, password):
@@ -406,7 +407,8 @@ if __name__ == '__main__':
     if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
         raise RuntimeError(
             "Cannot run Flask development server in production mode. Set FLASK_DEBUG=1 only for local development, "
-            "set ALLOW_DEV_SERVER=1 to override (unsafe for production), or use a production WSGI server like "
+            "set ALLOW_DEV_SERVER=1 to override (unsafe for production; do not use in production), or use a "
+            "production WSGI server like "
             "Gunicorn or uWSGI."
         )
     app.run(debug=is_debug)
