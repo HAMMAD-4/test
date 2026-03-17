@@ -292,15 +292,39 @@ def users():
 @app.route('/add', methods=['POST'])
 @login_required
 def add_user():
-    db.session.add(User(
-        name  = normalize_text(request.form.get('name')),
-        cnic  = normalize_text(request.form.get('cnic')),
-        email = normalize_text(request.form.get('email')),
-        phone = normalize_optional_text(request.form.get('phone')),
-        role  = normalize_role(request.form.get('role', 'User')),
-    ))
-    db.session.commit()
-    flash('User added successfully.')
+    names = request.form.getlist('name')
+    cnics = request.form.getlist('cnic')
+    emails = request.form.getlist('email')
+    phones = request.form.getlist('phone')
+    roles = request.form.getlist('role')
+
+    def value_at(values, index):
+        return values[index] if index < len(values) else ''
+
+    entry_count = max(len(names), len(cnics), len(emails), len(phones), len(roles))
+    new_users = []
+    for index in range(entry_count):
+        name = normalize_text(value_at(names, index))
+        cnic = normalize_text(value_at(cnics, index))
+        email = normalize_text(value_at(emails, index))
+        phone = normalize_optional_text(value_at(phones, index))
+        role = normalize_role(value_at(roles, index) or 'User')
+        if not (name and cnic and email):
+            continue
+        new_users.append(User(
+            name=name,
+            cnic=cnic,
+            email=email,
+            phone=phone,
+            role=role,
+        ))
+
+    if new_users:
+        db.session.add_all(new_users)
+        db.session.commit()
+        flash(f'{len(new_users)} user(s) added successfully.')
+    else:
+        flash('No users were added.')
     return redirect(url_for('users'))
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])

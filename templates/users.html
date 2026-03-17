@@ -199,6 +199,48 @@
             background: var(--surface);
         }
 
+        .user-entries {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .user-entry {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .entry-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .entry-actions button {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .2s, transform .15s;
+        }
+
+        .entry-actions button:hover {
+            opacity: .85;
+            transform: translateY(-1px);
+        }
+
+        .entry-actions button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .btn-add {
             padding: 10px 22px;
             background: linear-gradient(135deg, var(--accent), var(--accent2));
@@ -424,19 +466,27 @@
         <div class="add-panel">
             <h3>+ Add New User</h3>
             <form action="/add" method="POST">
-                <div class="form-grid">
-                    <input type="text" name="name" placeholder="Full Name" required>
-                    <input type="text" name="cnic" placeholder="CNIC / ID No." required>
-                    <input type="email" name="email" placeholder="Email Address" required>
-                    <input type="text" name="phone" placeholder="Phone Number">
-                    <select name="role">
-                        <option value="User">User</option>
-                        <option value="Manager">Manager</option>
-                        <option value="Admin">Admin</option>
-                    </select>
+                <div class="user-entries" id="user-entries">
+                    <div class="user-entry">
+                        <div class="form-grid">
+                            <input type="text" name="name" placeholder="Full Name" required>
+                            <input type="text" name="cnic" placeholder="CNIC / ID No." required>
+                            <input type="email" name="email" placeholder="Email Address" required>
+                            <input type="text" name="phone" placeholder="Phone Number">
+                            <select name="role">
+                                <option value="User">User</option>
+                                <option value="Manager">Manager</option>
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                        <div class="entry-actions">
+                            <button type="button" class="btn-duplicate" aria-label="Add another user">+</button>
+                            <button type="button" class="btn-remove" aria-label="Remove this user" disabled>−</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-row">
-                    <button type="submit" class="btn-add">Add User</button>
+                    <button type="submit" class="btn-add">Add Users</button>
                 </div>
             </form>
         </div>
@@ -491,6 +541,59 @@
             {% endif %}
         </div>
     </main>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const entries = document.getElementById('user-entries');
+            if (!entries) {
+                return;
+            }
+
+            const updateRemoveButtons = () => {
+                const removeButtons = entries.querySelectorAll('.btn-remove');
+                const disable = entries.children.length === 1;
+                removeButtons.forEach((button) => {
+                    button.disabled = disable;
+                });
+            };
+
+            const resetEntryValues = (entry) => {
+                entry.querySelectorAll('input, select').forEach((field) => {
+                    if (field.tagName === 'SELECT') {
+                        field.selectedIndex = 0;
+                    } else {
+                        field.value = '';
+                    }
+                });
+            };
+
+            entries.addEventListener('click', (event) => {
+                const duplicateButton = event.target.closest('.btn-duplicate');
+                const removeButton = event.target.closest('.btn-remove');
+
+                if (duplicateButton) {
+                    const entry = duplicateButton.closest('.user-entry');
+                    const clone = entry.cloneNode(true);
+                    resetEntryValues(clone);
+                    entries.appendChild(clone);
+                    updateRemoveButtons();
+                    const firstInput = clone.querySelector('input');
+                    if (firstInput) {
+                        firstInput.focus();
+                    }
+                }
+
+                if (removeButton && entries.children.length > 1) {
+                    const entry = removeButton.closest('.user-entry');
+                    if (entry) {
+                        entry.remove();
+                        updateRemoveButtons();
+                    }
+                }
+            });
+
+            updateRemoveButtons();
+        });
+    </script>
 </body>
 
 </html>
