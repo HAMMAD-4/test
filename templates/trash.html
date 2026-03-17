@@ -134,6 +134,16 @@
             margin-top: 4px;
         }
 
+        .page-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-actions form {
+            margin: 0;
+        }
+
         .flash-green {
             background: rgba(16, 185, 129, .12);
             border: 1px solid rgba(16, 185, 129, .3);
@@ -287,6 +297,23 @@
             background: rgba(16, 185, 129, .25);
         }
 
+        .btn-empty {
+            padding: 8px 18px;
+            background: rgba(255, 77, 109, .12);
+            color: var(--danger);
+            border: 1px solid rgba(255, 77, 109, .3);
+            border-radius: 10px;
+            font-size: .84rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .2s, transform .2s;
+        }
+
+        .btn-empty:hover {
+            background: rgba(255, 77, 109, .25);
+            transform: translateY(-1px);
+        }
+
         .empty {
             text-align: center;
             padding: 60px 0;
@@ -338,7 +365,15 @@
                 <h1>🗑️ Deleted Users (Trash)</h1>
                 <p>Records below are soft-deleted and hidden from the system — restore them any time</p>
             </div>
-            <a href="/users" class="btn-back">← Back to Users</a>
+            <div class="page-actions">
+                {% if users %}
+                <form action="{{ url_for('empty_trash') }}" method="POST"
+                    onsubmit="return confirm('Permanently delete all trashed users? This action cannot be undone.');">
+                    <button type="submit" class="btn-empty">🗑️ Empty Trash</button>
+                </form>
+                {% endif %}
+                <a href="/users" class="btn-back">← Back to Users</a>
+            </div>
         </div>
 
         {% with messages = get_flashed_messages() %}

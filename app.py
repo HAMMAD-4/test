@@ -366,6 +366,20 @@ def trash():
     deleted_users = User.query.filter_by(is_deleted=True).order_by(User.deleted_at.desc()).all()
     return render_template('trash.html', users=deleted_users)
 
+@app.route('/trash/empty', methods=['POST'])
+@login_required
+def empty_trash():
+    deleted_query = User.query.filter_by(is_deleted=True)
+    deleted_count = deleted_query.count()
+    if deleted_count == 0:
+        flash('Trash is already empty.')
+        return redirect(url_for('trash'))
+
+    deleted_query.delete(synchronize_session=False)
+    db.session.commit()
+    flash(f'Trash emptied — {deleted_count} user(s) permanently deleted.')
+    return redirect(url_for('trash'))
+
 # ─── SERVICES ROUTES ───────────────────────────────────────────────────────────
 
 @app.route('/services')
