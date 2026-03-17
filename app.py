@@ -299,9 +299,10 @@ def add_user():
     roles = request.form.getlist('role')
 
     def safe_get_list_value(values, index):
+        """Return list value or empty string when the index is out of range."""
         return values[index] if index < len(values) else ''
 
-    entry_count = min(len(names), len(cnics), len(emails), len(roles))
+    entry_count = min(len(names), len(cnics), len(emails), len(roles), len(phones))
     new_users = []
     for index in range(entry_count):
         name = normalize_text(safe_get_list_value(names, index))
