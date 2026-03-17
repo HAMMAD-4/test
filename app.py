@@ -2,11 +2,19 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
+import hmac
 import os
 import secrets
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+IS_DEBUG = os.environ.get('FLASK_DEBUG') == '1'
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    if IS_DEBUG:
+        secret_key = secrets.token_hex(32)
+    else:
+        raise RuntimeError('SECRET_KEY environment variable must be set')
+app.config['SECRET_KEY'] = secret_key
 
 # Database Configuration
 database_url = os.environ.get('DATABASE_URL')
@@ -154,11 +162,7 @@ def verify_admin_password(admin, password):
             return True
     except ValueError:
         pass
-    if admin.password == password:
-        admin.password = generate_password_hash(password)
-        db.session.commit()
-        return True
-    return False
+    return hmac.compare_digest(admin.password or '', password)
 
 # ─── AUTH ROUTES ───────────────────────────────────────────────────────────────
 
@@ -319,4 +323,6 @@ def restore_service(id):
     return redirect(url_for('services'))
 
 if __name__ == '__main__':
-    app.run(debug=os.environ.get('FLASK_DEBUG') == '1')
+    if not IS_DEBUG and os.environ.get('ALLOW_DEV_SERVER') != '1':
+        raise RuntimeError('Refusing to start the dev server without FLASK_DEBUG=1')
+    app.run(debug=IS_DEBUG)
