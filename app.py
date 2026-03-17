@@ -137,7 +137,8 @@ def ensure_users_phone_column():
     if 'phone' in columns:
         return
     try:
-        db.session.execute(text('ALTER TABLE users ADD COLUMN phone VARCHAR(20) NULL'))
+        phone_length = User.phone.type.length or 20
+        db.session.execute(text(f'ALTER TABLE users ADD COLUMN phone VARCHAR({phone_length}) NULL'))
         db.session.commit()
     except SQLAlchemyError as exc:
         app.logger.warning('Unable to add users.phone column: %s', exc)
@@ -357,7 +358,7 @@ def restore_service(id):
 if __name__ == '__main__':
     if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
         raise RuntimeError(
-            "Refusing to start the dev server. Set FLASK_DEBUG='1' for development, "
+            "Refusing to start the dev server. Set FLASK_DEBUG=1 for development, "
             "set ALLOW_DEV_SERVER=1 to override, or use a production WSGI server."
         )
     app.run(debug=is_debug)
