@@ -113,6 +113,7 @@ DEFAULT_SERVICES = [
 
 DEFAULT_ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 DEFAULT_ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+ALLOW_ADMIN_PASSWORD_UPDATE = os.environ.get('UPDATE_ADMIN_PASSWORD') == '1'
 VALID_ROLES = {'User', 'Manager', 'Admin'}
 
 def password_matches(stored_hash, candidate):
@@ -142,7 +143,7 @@ with app.app_context():
                 ))
                 db.session.commit()
             else:
-                if not password_matches(admin.password, admin_password):
+                if ALLOW_ADMIN_PASSWORD_UPDATE and not password_matches(admin.password, admin_password):
                     admin.password = generate_password_hash(admin_password)
                     db.session.commit()
 
@@ -335,5 +336,5 @@ def restore_service(id):
 
 if __name__ == '__main__':
     if not is_debug and os.environ.get('ALLOW_DEV_SERVER') != '1':
-        raise RuntimeError('Refusing to start the dev server without FLASK_DEBUG=1 or ALLOW_DEV_SERVER=1')
+        raise RuntimeError("Refusing to start the dev server without FLASK_DEBUG='1' or ALLOW_DEV_SERVER=1")
     app.run(debug=is_debug)
